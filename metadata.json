@@ -1,0 +1,7 @@
+{
+  "name": "Multilingual Mandi",
+  "description": "A linguistic bridge for local Indian trade, enabling farmers to sell produce through AI-powered translation and price discovery.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

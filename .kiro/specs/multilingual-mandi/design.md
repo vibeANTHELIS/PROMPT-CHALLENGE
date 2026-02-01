@@ -2,54 +2,99 @@
 
 ## Overview
 
-Multilingual Mandi is a React-based web application that bridges language barriers in local Indian produce markets. The system provides voice-first interfaces for vendors, real-time translation capabilities, AI-powered price discovery, and negotiation tools. The application simulates AI translation and voice recognition features using client-side JavaScript, making it deployable as a static web application.
+Multilingual Mandi is a full-stack web application that bridges language barriers in local Indian produce markets. The system provides voice-first interfaces for vendors, real-time translation capabilities, AI-powered price discovery, and negotiation tools. The application uses Google Gemini AI for real translation and voice recognition features, with a React frontend, Node.js/Express backend, and MongoDB database.
 
-The design emphasizes accessibility, mobile-first responsive design, and cultural appropriateness through the Viksit Bharat theme. All AI features are simulated to provide realistic user experiences without requiring external AI services.
+The design emphasizes accessibility, mobile-first responsive design, and cultural appropriateness through the Viksit Bharat theme. AI features are powered by Google Gemini 2.0 Flash/Pro models for production-ready translation and voice processing capabilities.
 
 ## Architecture
 
 ### System Architecture
 
 ```mermaid
-graph TB
-    subgraph "Client Application (React)"
-        UI[User Interface Layer]
-        SM[State Management - Context API]
-        TL[Translation Layer]
-        VI[Voice Interface Simulator]
-        PD[Price Discovery Engine]
-        NC[Negotiation Chat]
-        DM[Data Manager - LocalStorage]
+graph TD
+    %% Styling
+    classDef client fill:#e3f2fd,stroke:#1565c0,stroke-width:2px;
+    classDef server fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
+    classDef db fill:#fff3e0,stroke:#ef6c00,stroke-width:2px;
+    classDef external fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px;
+    classDef actor fill:#fafafa,stroke:#333,stroke-width:1px,stroke-dasharray: 5 5;
+
+    %% Actors
+    Farmer(🧑‍🌾 Farmer)
+    Buyer(🏢 Buyer)
+
+    subgraph Client [Frontend - React/Vite]
+        direction TB
+        App[App.tsx<br/>Router & State]
+        UI[UI Components<br/>Farmer/Buyer Dashboard]
+        API_Client[api.ts<br/>HTTP Fetch Wrapper]
+        Gemini_Service[geminiService.ts<br/>AI Client SDK]
+        
+        App --> UI
+        UI --> API_Client
+        UI --> Gemini_Service
     end
-    
-    subgraph "Simulated Services"
-        TS[Translation Service]
-        VS[Voice Recognition Service]
-        PS[Price Service]
+
+    subgraph Backend [Backend Server - Node.js/Express]
+        direction TB
+        Server_Entry[index.js<br/>App Entry Point]
+        Auth_Route[User Routes<br/>/api/users]
+        Listing_Route[Listing Routes<br/>/api/listings]
+        Message_Route[Message Routes<br/>/api/messages]
+        
+        Server_Entry --> Auth_Route
+        Server_Entry --> Listing_Route
+        Server_Entry --> Message_Route
     end
+
+    subgraph Database [Data Layer - MongoDB]
+        Mongo_Users[(User Collection)]
+        Mongo_Listings[(Listing Collection)]
+        Mongo_Messages[(Message Collection)]
+    end
+
+    subgraph External [External Services]
+        Google_AI[✨ Google Gemini 2.0<br/>Flash/Pro Models]
+    end
+
+    %% Interactions
+    Farmer -->|Uses UI| Client
+    Buyer -->|Uses UI| Client
+
+    %% Client to Backend
+    API_Client -->|HTTP/REST JSON| Server_Entry
+    API_Client -->|Login/Register| Auth_Route
+    API_Client -->|CRUD Listings| Listing_Route
+    API_Client -->|Send/Get Msgs| Message_Route
+
+    %% Client to AI (Direct)
+    Gemini_Service <-->|WebSocket/Stream<br/>Audio & Text| Google_AI
+    Gemini_Service -->|Generate Market Insight<br/>Translate Text| Google_AI
+
+    %% Backend to Database
+    Auth_Route -->|Read/Write| Mongo_Users
+    Listing_Route -->|Read/Write| Mongo_Listings
+    Message_Route -->|Read/Write| Mongo_Messages
+
+    %% Message Flow context
+    Message_Route -.->|Stores Msgs| Mongo_Messages
     
-    UI --> SM
-    SM --> TL
-    SM --> VI
-    SM --> PD
-    SM --> NC
-    SM --> DM
-    
-    TL --> TS
-    VI --> VS
-    PD --> PS
-    
-    DM --> LS[(Local Storage)]
+    class Client client;
+    class Backend server;
+    class Database db;
+    class External external;
+    class Farmer,Buyer actor;
 ```
 
 ### Component Architecture
 
-The application follows a component-based architecture with clear separation of concerns:
+The application follows a full-stack architecture with clear separation of concerns:
 
-- **Presentation Layer**: React components with Tailwind CSS styling
-- **Business Logic Layer**: Custom hooks and service modules
-- **Data Layer**: LocalStorage with structured data models
-- **Simulation Layer**: Mock services for AI features
+- **Frontend Layer**: React components with TypeScript and Tailwind CSS styling
+- **API Layer**: RESTful endpoints for data operations and user management
+- **Business Logic Layer**: Express.js middleware and route handlers
+- **Data Layer**: MongoDB with Mongoose ODM for data persistence
+- **AI Integration Layer**: Direct client-side integration with Google Gemini API
 
 ## Components and Interfaces
 
@@ -126,44 +171,44 @@ interface ChatMessage {
 
 ### Service Interfaces
 
-#### Translation Service
+#### API Client Service
 ```typescript
-interface TranslationService {
-  translate(text: string, from: SupportedLanguage, to: SupportedLanguage): Promise<TranslationResult>;
-  detectLanguage(text: string): Promise<SupportedLanguage>;
-  getSupportedLanguages(): SupportedLanguage[];
+interface APIClient {
+  login(phoneNumber: string, role: UserRole, language: SupportedLanguage): Promise<User>;
+  getListings(): Promise<Listing[]>;
+  createListing(listing: CreateListingRequest): Promise<Listing>;
+  updateListing(id: string, updates: Partial<Listing>): Promise<Listing>;
+  deleteListing(id: string): Promise<void>;
+  getMessages(userId: string): Promise<ChatMessage[]>;
+  sendMessage(message: CreateMessageRequest): Promise<ChatMessage>;
 }
 
-interface TranslationResult {
-  translatedText: string;
-  confidence: number;
-  originalLanguage: SupportedLanguage;
-  targetLanguage: SupportedLanguage;
-}
-```
-
-#### Voice Recognition Service
-```typescript
-interface VoiceRecognitionService {
-  startRecording(language: SupportedLanguage): Promise<void>;
-  stopRecording(): Promise<VoiceRecognitionResult>;
-  isSupported(): boolean;
-}
-
-interface VoiceRecognitionResult {
-  text: string;
-  confidence: number;
+interface CreateListingRequest {
+  produce: ProduceType;
+  description: string;
+  price: number;
+  quantity: number;
+  unit: string;
+  quality: QualityGrade;
   language: SupportedLanguage;
-  duration: number;
 }
 ```
 
-#### Price Discovery Service
+#### Gemini AI Service
 ```typescript
-interface PriceDiscoveryService {
-  getCurrentPrices(produce: ProduceType[]): Promise<MarketPrice[]>;
-  getPriceHistory(produce: ProduceType, days: number): Promise<PriceHistoryPoint[]>;
-  suggestPrice(produce: ProduceType, quality: QualityGrade): Promise<PriceSuggestion>;
+interface GeminiService {
+  translateText(text: string, from: SupportedLanguage, to: SupportedLanguage): Promise<TranslationResult>;
+  generateMarketInsights(produce: ProduceType[]): Promise<MarketInsight[]>;
+  processVoiceInput(audioBlob: Blob, language: SupportedLanguage): Promise<VoiceRecognitionResult>;
+  startLiveAudioSession(language: SupportedLanguage): Promise<LiveAudioSession>;
+}
+
+interface MarketInsight {
+  produce: ProduceType;
+  currentPrice: PriceRange;
+  trend: 'rising' | 'falling' | 'stable';
+  recommendation: string;
+  confidence: number;
 }
 ```
 
@@ -176,22 +221,24 @@ type SupportedLanguage = 'hindi' | 'tamil' | 'english';
 type ProduceType = 'onions' | 'tomatoes' | 'potatoes' | 'rice' | 'wheat' | 'carrots';
 type QualityGrade = 'premium' | 'standard' | 'economy';
 type ListingStatus = 'active' | 'sold' | 'unavailable';
+type UserRole = 'farmer' | 'buyer';
 
 interface User {
-  id: string;
-  name: string;
-  type: 'vendor' | 'buyer';
+  _id: string;
+  phoneNumber: string;
+  role: UserRole;
   preferredLanguage: SupportedLanguage;
-  location: string;
-  phoneNumber?: string;
+  name?: string;
+  location?: string;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 interface Listing {
-  id: string;
-  vendorId: string;
+  _id: string;
+  farmerId: string;
   produce: ProduceType;
-  originalDescription: string;
+  description: string;
   translatedDescriptions: Record<SupportedLanguage, string>;
   originalLanguage: SupportedLanguage;
   price: number;
@@ -200,20 +247,21 @@ interface Listing {
   quality: QualityGrade;
   status: ListingStatus;
   images?: string[];
-  location: string;
+  location?: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
-interface ChatSession {
-  id: string;
-  buyerId: string;
-  vendorId: string;
-  listingId: string;
-  messages: ChatMessage[];
-  status: 'active' | 'closed';
-  createdAt: Date;
-  lastActivity: Date;
+interface ChatMessage {
+  _id: string;
+  senderId: string;
+  receiverId: string;
+  listingId?: string;
+  originalText: string;
+  translatedText: Record<SupportedLanguage, string>;
+  originalLanguage: SupportedLanguage;
+  timestamp: Date;
+  isRead: boolean;
 }
 ```
 
@@ -223,15 +271,16 @@ interface ChatSession {
 interface AppState {
   currentUser: User | null;
   listings: Listing[];
-  chatSessions: ChatSession[];
-  marketPrices: MarketPrice[];
+  messages: ChatMessage[];
+  marketInsights: MarketInsight[];
   uiState: {
-    currentView: 'vendor' | 'buyer' | 'chat';
+    currentView: 'farmer' | 'buyer' | 'chat';
     selectedListing: string | null;
     activeChatSession: string | null;
     isVoiceRecording: boolean;
     searchQuery: string;
     filters: ProduceFilter[];
+    isLoading: boolean;
   };
   settings: {
     theme: 'light' | 'dark';
@@ -319,25 +368,29 @@ Based on the prework analysis, here are the consolidated correctness properties:
 
 ## Error Handling
 
-### Translation Service Error Handling
-- **Network Simulation Failures**: When simulated translation services are unavailable, display original text with retry options
-- **Language Detection Errors**: Fallback to user's preferred language when automatic detection fails
-- **Partial Translation Failures**: Show partially translated content with clear indicators of incomplete sections
+### API Error Handling
+- **Network Failures**: Implement retry logic with exponential backoff for API calls
+- **Authentication Errors**: Redirect to login flow when tokens expire or are invalid
+- **Server Errors**: Display user-friendly error messages and provide fallback options
+- **Rate Limiting**: Handle API rate limits gracefully with appropriate user feedback
 
-### Voice Recognition Error Handling
-- **Microphone Access Simulation**: Provide clear feedback when voice recording simulation cannot start
-- **Audio Processing Errors**: Display helpful error messages and alternative input methods
-- **Language Mismatch**: Alert users when detected language doesn't match selected language
+### Gemini AI Error Handling
+- **Translation Failures**: Fallback to original text with retry options when translation fails
+- **Voice Recognition Errors**: Provide clear feedback when voice processing fails
+- **API Quota Exceeded**: Implement graceful degradation when AI services are unavailable
+- **Language Detection Errors**: Fallback to user's preferred language when detection fails
 
-### Data Persistence Error Handling
-- **Storage Quota Exceeded**: Implement automatic cleanup of old data with user notification
-- **Corrupted Data Recovery**: Validate data integrity on load and provide recovery options
-- **Migration Failures**: Maintain backward compatibility and graceful degradation
+### Database Error Handling
+- **Connection Failures**: Implement connection pooling and retry mechanisms
+- **Data Validation Errors**: Provide clear validation feedback to users
+- **Concurrent Updates**: Handle optimistic locking and conflict resolution
+- **Storage Limits**: Implement data archiving and cleanup strategies
 
 ### UI Error Handling
 - **Component Load Failures**: Show skeleton screens and retry mechanisms
 - **Network Connectivity**: Provide offline mode indicators and cached data access
 - **Browser Compatibility**: Graceful degradation for unsupported features
+- **Performance Issues**: Implement loading states and progressive enhancement
 
 ## Testing Strategy
 
@@ -372,27 +425,40 @@ The testing strategy employs both unit testing and property-based testing to ens
 
 **Component Testing:**
 - Test React components in isolation using React Testing Library
-- Mock external dependencies and focus on component behavior
+- Mock API calls and external dependencies
 - Validate accessibility features and responsive design
 
 **Integration Testing:**
-- Test complete user workflows from voice input to listing creation
-- Validate translation pipeline from input to display
-- Test chat functionality with simulated real-time translation
+- Test complete user workflows from API to UI
+- Validate data flow between frontend and backend
+- Test Gemini AI integration with real API calls
 
-**Simulation Testing:**
-- Validate AI service simulations behave consistently
-- Test error scenarios and fallback mechanisms
-- Ensure simulation realism for user experience validation
+**API Testing:**
+- Test all REST endpoints with various input scenarios
+- Validate authentication and authorization flows
+- Test error handling and edge cases
+
+**Database Testing:**
+- Test MongoDB operations and data integrity
+- Validate schema migrations and data consistency
+- Test concurrent access and transaction handling
 
 ### Performance Testing Considerations
 
-**Client-Side Performance:**
+**Frontend Performance:**
 - Test application performance with large datasets (1000+ listings)
 - Validate smooth scrolling and responsive interactions
 - Monitor memory usage during extended chat sessions
+- Optimize bundle size and implement code splitting
 
-**Storage Performance:**
-- Test local storage operations with large data volumes
-- Validate cleanup and migration performance
-- Ensure data export functionality scales appropriately
+**Backend Performance:**
+- Test API response times under various load conditions
+- Validate database query performance and indexing
+- Monitor server resource usage and scaling capabilities
+- Implement caching strategies for frequently accessed data
+
+**AI Integration Performance:**
+- Test Gemini API response times for translation and voice processing
+- Implement request batching and caching for market insights
+- Monitor API quota usage and implement rate limiting
+- Optimize audio processing and streaming performance
